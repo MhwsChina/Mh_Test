@@ -1,2 +1,4 @@
 # Mh_Test
-a cc attack test program
+<p>下载后打开mht.py即可使用</p>
+<p>使用该工具所产生的后果作者一律不负责</p>
+<p>本工具为cc压力测试工具,请勿用于非法用途</p>
