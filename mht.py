@@ -2,7 +2,7 @@ import socket,sys,time
 import threading as th
 from random import choice,randint
 from tqdm import tqdm
-m,version='beta','0.0.1b'
+m,version='beta','0.0.1_b'
 useragents=[
     'Java/21.0.3',
     'Python-urllib/2.5',
