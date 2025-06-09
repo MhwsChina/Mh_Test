@@ -2,7 +2,7 @@ import socket,sys,time
 import threading as th
 from random import choice,randint
 from tqdm import tqdm
-m,version='beta','0.0.1a'
+m,version='beta','0.0.1b'
 useragents=[
     'Java/21.0.3',
     'Python-urllib/2.5',
@@ -82,12 +82,13 @@ class mht_default(th.Thread):
                 clients.append(create_client())
                 del clients[tmpa]
 def create_client():
+    ip1=ip.split('/')[0]
     while 1:
         try:
             temp_client=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             #端口复用,防止报错
             temp_client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            temp_client.connect((ip,port))
+            temp_client.connect((ip1,port))
             return temp_client
         except:pass
 def sclient():
