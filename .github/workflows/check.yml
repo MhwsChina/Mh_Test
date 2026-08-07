@@ -1,0 +1,45 @@
+name: Check Release and Sync Assets
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release Tag (例如 v1.0.0)'
+        required: true
+        type: string
+
+# 赋予工作流写入 Release 的权限
+permissions:
+  contents: write
+
+jobs:
+  trigger-build:
+    uses: ./.github/workflows/buildpy.yml
+    with:
+      release_tag: ${{ inputs.release_tag || github.event.release.tag_name }}
+
+  sync-to-release:
+    if: always() 
+    needs: trigger-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: List downloaded files (Debug)
+        run: ls -R artifacts/
+
+      - name: Upload Assets to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag || github.event.release.tag_name }}
+          # 核心修复：直接匹配 artifacts 目录下所有的可执行文件
+          files: |
+            artifacts/**/**
+          overwrite_files: true 
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
