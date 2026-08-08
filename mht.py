@@ -2,7 +2,7 @@ import socket,sys,time,os,ctypes
 import threading as th
 from random import choice,randint
 from tqdm import tqdm
-version,m1='b0.0.2c','(c)Copyrighgt 2025-2026 _MhwsChina_'
+version,m1='v0.0.3','(c)Copyrighgt 2025-2026 _MhwsChina_'
 useragents=[
     'Java/21.0.3',
     'Python-urllib/2.5',
@@ -82,8 +82,10 @@ def mht_TCPdefault():
             if c1==10:print(f'\r[+] SENT @ {c}',end='\033[K');c1=0
         except RuntimeError:return
         except Exception as ad:
-            print(f'\r[-] {ad} @ {c}',end='\033[K'+('\n' if debug else ''))
-            qe+=1;client=create_tcp_client()
+            try:
+                print(f'\r[-] {ad} @ {c}',end='\033[K'+('\n' if debug else ''))
+                qe+=1;client=create_tcp_client()
+            except:return
         try:clients.append(client)
         except:return
 def mht_UDPdefault():
@@ -99,8 +101,10 @@ def mht_UDPdefault():
             if c1==10:print(f'\r[+] SENT @ {c}',end='\033[K');c1=0
         except RuntimeError:return
         except Exception as ad:
-            print(f'\r[-] ERROR @ {c} {ad}',end='\033[K'+('\n' if debug else ''))
-            qe+=1;client=create_udp_client()
+            try:
+                print(f'\r[-] ERROR @ {c} {ad}',end='\033[K'+('\n' if debug else ''))
+                qe+=1;client=create_udp_client()
+            except:return
         try:clients.append(client)
         except:return
 def create_tcp_client():
